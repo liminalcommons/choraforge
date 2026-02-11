@@ -1,0 +1,24 @@
+{
+  "name": "castalia-subset",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Simplified Castalia subset for integration testing — multiplayer world, calendar, theming",
+  "workspaces": [
+    "packages/client",
+    "packages/server",
+    "packages/types"
+  ],
+  "scripts": {
+    "build": "npm run build:types && npm run build:client",
+    "build:types": "cd packages/types && npm run build",
+    "build:client": "cd packages/client && npm run build",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd packages/server && npm run dev",
+    "dev:client": "cd packages/client && npm run dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}
