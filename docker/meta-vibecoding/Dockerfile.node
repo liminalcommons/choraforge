@@ -1,0 +1,31 @@
+# ABOUTME: Pre-built Docker base image for Node.js meta-vibecoding cells.
+# Includes Node 22, Bun, Git, and common CLI tools (eslint, prettier).
+
+FROM node:22-slim
+
+LABEL org.opencontainers.image.title="meta-vibecoding/cell-node"
+LABEL org.opencontainers.image.description="Node.js cell base image for meta-vibecoding platform"
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    jq \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+
+# Install common Node.js CLI tools globally
+RUN npm install -g eslint prettier typescript
+
+# Create workspace directory
+RUN mkdir -p /workspace
+WORKDIR /workspace
+
+# Placeholder for choraforge CLI (copied in at build time when available)
+# COPY choraforge /usr/local/bin/choraforge
+
+ENTRYPOINT ["/bin/bash"]

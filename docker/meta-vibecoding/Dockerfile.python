@@ -1,0 +1,31 @@
+# ABOUTME: Pre-built Docker base image for Python meta-vibecoding cells.
+# Includes Python 3.12, uv, Git, and common tools (ruff, mypy).
+
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.title="meta-vibecoding/cell-python"
+LABEL org.opencontainers.image.description="Python cell base image for meta-vibecoding platform"
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    jq \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (fast Python package manager)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+# Install common Python CLI tools
+RUN uv tool install ruff && uv tool install mypy
+
+# Create workspace directory
+RUN mkdir -p /workspace
+WORKDIR /workspace
+
+# Placeholder for choraforge CLI (copied in at build time when available)
+# COPY choraforge /usr/local/bin/choraforge
+
+ENTRYPOINT ["/bin/bash"]
