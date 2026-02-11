@@ -24,7 +24,67 @@ import {
   executeSkillsCommand,
   executeRemoteCommand,
   executeBlueprintCommand,
+  executeAppCreateCommand,
+  executeAppListCommand,
+  executeAppStartCommand,
+  executeAppStopCommand,
+  executeAppStatusCommand,
+  executeAppDestroyCommand,
+  executeAppBlueprintCommand,
 } from './commands/index.js';
+
+/**
+ * Show CLI help message.
+ */
+function printAppHelp(): void {
+  console.log(`
+choraforge app - App Management Commands
+
+Usage: choraforge app <subcommand> [options]
+
+Subcommands:
+  create              Register a new app
+  list                List all registered apps
+  start               Launch evolution for an app
+  stop                Stop a running app
+  status              Show detailed status for an app
+  destroy             Remove an app and its Docker cell
+  blueprint           Start interactive blueprint dialogue for an app
+  help               Show this help message
+
+Create Options:
+  --name, -n <name>    App name (required, unique)
+  --repo, -r <url>      Git repository URL (required)
+  --stack, -s <type>    Stack type: node, python, rust (default: node)
+  --agent, -a <name>     Agent type: openclaw, claude (default: openclaw)
+
+Destroy Options:
+  --confirm           Must be set to confirm destruction (safety flag)
+
+Start Options:
+  --blueprint, -b <path> Blueprint file path (default: app's configured path)
+
+Description:
+  Manage apps in the ChoraForge platform. Apps are registered in
+  ~/.config/meta-vibecoding/apps.json and each runs in its own Docker cell.
+
+  Workflow:
+  1. Create: Register app with repo URL and stack type
+  2. Blueprint: Create interactive blueprint with AI
+  3. Start: Launch evolution loop
+  4. Status/Stop: Monitor and control running apps
+  5. Destroy: Remove app and its Docker cell (requires --confirm)
+
+Examples:
+  choraforge app create --name myapp --repo https://github.com/user/repo
+  choraforge app list
+  choraforge app start myapp
+  choraforge app status myapp
+  choraforge app stop myapp
+  choraforge app destroy myapp --confirm
+  choraforge app blueprint myapp
+`);
+}
 
 /**
  * Show CLI help message.
@@ -58,6 +118,13 @@ Commands:
   plugins trackers    List available tracker plugins
   docs [section]      Open documentation in browser
   info [options]      Display system information for bug reports
+  app create         Register a new app
+  app list           List all registered apps
+  app start          Launch evolution for an app
+  app stop           Stop a running app
+  app status         Show detailed status for an app
+  app destroy        Remove an app and its Docker cell
+  app blueprint       Start interactive blueprint dialogue for an app
   help, --help, -h    Show this help message
   version, --version, -v  Show version number
 
@@ -131,6 +198,13 @@ Examples:
   choraforge remote add prod server:7890 --token abc  # Add remote
   choraforge remote list                  # List remotes with status
   choraforge remote test prod             # Test connectivity
+  choraforge app create --name myapp --repo https://github.com/user/repo
+  choraforge app list
+  choraforge app start myapp
+  choraforge app status myapp
+  choraforge app stop myapp
+  choraforge app destroy myapp --confirm
+  choraforge app blueprint myapp
 `);
 }
 
@@ -266,6 +340,58 @@ async function handleSubcommand(args: string[]): Promise<boolean> {
   // Remote command (manage remote configurations)
   if (command === 'remote') {
     await executeRemoteCommand(args.slice(1));
+    return true;
+  }
+
+  // App command (US-13: App Management)
+  if (command === 'app') {
+    const subcommand = args[1];
+
+    if (!subcommand || subcommand === '--help' || subcommand === '-h') {
+      printAppHelp();
+      return true;
+    }
+
+    if (subcommand === 'create') {
+      await executeAppCreateCommand(args.slice(2));
+      return true;
+    }
+
+    if (subcommand === 'list') {
+      await executeAppListCommand();
+      return true;
+    }
+
+    if (subcommand === 'start') {
+      await executeAppStartCommand(args.slice(2));
+      return true;
+    }
+
+    if (subcommand === 'stop') {
+      await executeAppStopCommand(args.slice(2));
+      return true;
+    }
+
+    if (subcommand === 'status') {
+      await executeAppStatusCommand(args.slice(2));
+      return true;
+    }
+
+    if (subcommand === 'destroy') {
+      await executeAppDestroyCommand(args.slice(2));
+      return true;
+    }
+
+    if (subcommand === 'blueprint') {
+      await executeAppBlueprintCommand(args.slice(2));
+      return true;
+    }
+
+    // Unknown or missing app subcommand
+    if (subcommand) {
+      console.error(`Unknown app subcommand: ${subcommand}`);
+    }
+    printAppHelp();
     return true;
   }
 

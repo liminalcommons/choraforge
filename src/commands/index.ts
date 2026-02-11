@@ -103,3 +103,25 @@ export {
   parseBlueprintArgs,
   printBlueprintHelp,
 } from './blueprint.js';
+
+export {
+  executeAppCreateCommand,
+  parseAppCreateArgs,
+  printAppCreateHelp,
+  executeAppListCommand,
+  executeAppStartCommand,
+  parseAppStartArgs,
+  printAppStartHelp,
+  executeAppStopCommand,
+  parseAppStopArgs,
+  printAppStopHelp,
+  executeAppStatusCommand,
+  parseAppStatusArgs,
+  printAppStatusHelp,
+  executeAppDestroyCommand,
+  parseAppDestroyArgs,
+  printAppDestroyHelp,
+  executeAppBlueprintCommand,
+  parseAppBlueprintArgs,
+  printAppBlueprintHelp,
+} from './app.js';
