@@ -9,6 +9,7 @@ import createJsonTracker from './json/index.js';
 import createBeadsTracker from './beads/index.js';
 import createBeadsBvTracker from './beads-bv/index.js';
 import createBeadsRustTracker from './beads-rust/index.js';
+import createEvolutionTracker from './evolution/index.js';
 
 /**
  * All built-in tracker plugin factories.
@@ -18,6 +19,7 @@ export const builtinTrackers = {
   beads: createBeadsTracker,
   'beads-bv': createBeadsBvTracker,
   'beads-rust': createBeadsRustTracker,
+  evolution: createEvolutionTracker,
 } as const;
 
 /**
@@ -37,4 +39,5 @@ export {
   createBeadsTracker,
   createBeadsBvTracker,
   createBeadsRustTracker,
+  createEvolutionTracker,
 };

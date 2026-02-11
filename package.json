@@ -1,7 +1,7 @@
 {
-  "name": "ralph-tui",
-  "version": "0.7.1",
-  "description": "Ralph TUI - AI Agent Loop Orchestrator",
+  "name": "choraforge",
+  "version": "0.1.0",
+  "description": "ChoraForge - Evolutionary Multi-Model AI Agent Orchestrator (fork of ralph-tui)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,11 +12,12 @@
     }
   },
   "bin": {
+    "choraforge": "./dist/cli.js",
     "ralph-tui": "./dist/cli.js"
   },
   "scripts": {
-    "build": "bun build ./src/cli.tsx --outdir ./dist --target bun --sourcemap=external && bun build ./src/index.ts --outdir ./dist --target bun --sourcemap=external && cp -r assets dist/ && cp -r skills dist/ && bun run build:templates",
-    "build:templates": "mkdir -p dist/plugins/trackers/builtin/beads dist/plugins/trackers/builtin/beads-bv dist/plugins/trackers/builtin/json dist/plugins/trackers/builtin/beads-rust && cp src/plugins/trackers/builtin/beads/template.hbs dist/plugins/trackers/builtin/beads/ && cp src/plugins/trackers/builtin/beads-bv/template.hbs dist/plugins/trackers/builtin/beads-bv/ && cp src/plugins/trackers/builtin/json/template.hbs dist/plugins/trackers/builtin/json/ && cp src/plugins/trackers/builtin/beads-rust/template.hbs dist/plugins/trackers/builtin/beads-rust/",
+    "build": "bun build ./src/cli.tsx --outdir ./dist --target bun --sourcemap=external && bun build ./src/index.ts --outdir ./dist --target bun --sourcemap=external && cp -R assets dist/ && cp -R skills dist/ && bun run build:templates",
+    "build:templates": "mkdir -p dist/plugins/trackers/builtin/beads dist/plugins/trackers/builtin/beads-bv dist/plugins/trackers/builtin/json dist/plugins/trackers/builtin/beads-rust dist/plugins/trackers/builtin/evolution && cp src/plugins/trackers/builtin/beads/template.hbs dist/plugins/trackers/builtin/beads/ && cp src/plugins/trackers/builtin/beads-bv/template.hbs dist/plugins/trackers/builtin/beads-bv/ && cp src/plugins/trackers/builtin/json/template.hbs dist/plugins/trackers/builtin/json/ && cp src/plugins/trackers/builtin/beads-rust/template.hbs dist/plugins/trackers/builtin/beads-rust/ && cp src/plugins/trackers/builtin/evolution/template.hbs dist/plugins/trackers/builtin/evolution/",
     "build:types": "tsc --emitDeclarationOnly --declaration --outDir dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
@@ -46,11 +47,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/subsy/ralph-tui.git"
+    "url": "https://github.com/liminalcommons/choraforge.git"
   },
-  "homepage": "https://github.com/subsy/ralph-tui",
+  "homepage": "https://github.com/liminalcommons/choraforge",
   "bugs": {
-    "url": "https://github.com/subsy/ralph-tui/issues"
+    "url": "https://github.com/liminalcommons/choraforge/issues"
   },
   "packageManager": "bun@1.3.6",
   "engines": {

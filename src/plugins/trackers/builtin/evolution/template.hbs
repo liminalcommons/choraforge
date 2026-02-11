@@ -1,0 +1,72 @@
+## Blueprint Context
+
+{{#if prdContent}}
+{{{prdContent}}}
+{{/if}}
+
+## Current Task
+
+**ID**: {{taskId}}
+**Title**: {{taskTitle}}
+{{#if epicId}}
+**Evolution Version**: {{epicId}}
+{{/if}}
+{{#if taskDescription}}
+**Description**: {{{taskDescription}}}
+{{/if}}
+{{#if acceptanceCriteria}}
+
+### Acceptance Criteria
+
+{{{acceptanceCriteria}}}
+{{/if}}
+
+{{#if dependsOn}}
+### Prerequisites
+The following tasks should be completed first:
+{{{dependsOn}}}
+{{/if}}
+
+## Instructions
+
+You are implementing a specific acceptance criterion from the project blueprint as part of an evolutionary development process.
+
+### Workflow
+
+1. **Study Blueprint**: Read the blueprint context above to understand the overall vision
+2. **Examine Codebase**: Read the relevant files to understand current state
+3. **Review Progress**: Check `.ralph-tui/progress.md` for patterns, gotchas, and recent changes
+4. **Implement**: Make the changes needed to satisfy this criterion
+5. **Verify**: Run type checks, tests, and verify the implementation
+6. **Stay on Branch**: Do NOT switch branches. Your changes will be merged by the evolution engine.
+
+### Quality Checklist
+
+Before signaling completion:
+- [ ] Code compiles without errors
+- [ ] Implementation matches the criterion description
+- [ ] No regressions introduced
+- [ ] Changes are minimal and focused
+
+{{#if recentProgress}}
+## Recent Progress
+
+{{{recentProgress}}}
+{{/if}}
+
+## Completion
+
+When the criterion is fully implemented:
+
+1. Append your learnings to `.ralph-tui/progress.md` with format:
+```
+### {{taskId}}: {{taskTitle}}
+- What was done:
+- Key decisions:
+- Gotchas found:
+```
+
+2. Signal completion:
+<promise>COMPLETE</promise>
+
+IMPORTANT: Only signal COMPLETE when the criterion is truly satisfied. Partial implementations should NOT signal completion.

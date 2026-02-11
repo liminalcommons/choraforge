@@ -11,6 +11,7 @@ import createGeminiAgent from './gemini.js';
 import createCodexAgent from './codex.js';
 import createKiroAgent from './kiro.js';
 import createCursorAgent from './cursor.js';
+import createKimiK2Agent from './kimi-k2.js';
 
 /**
  * Register all built-in agent plugins with the registry.
@@ -27,6 +28,7 @@ export function registerBuiltinAgents(): void {
   registry.registerBuiltin(createCodexAgent);
   registry.registerBuiltin(createKiroAgent);
   registry.registerBuiltin(createCursorAgent);
+  registry.registerBuiltin(createKimiK2Agent);
 }
 
 // Export the factory functions for direct use
@@ -38,6 +40,7 @@ export {
   createCodexAgent,
   createKiroAgent,
   createCursorAgent,
+  createKimiK2Agent,
 };
 
 // Export Claude JSONL parsing types and utilities
@@ -49,3 +52,4 @@ export { GeminiAgentPlugin } from './gemini.js';
 export { CodexAgentPlugin } from './codex.js';
 export { KiroAgentPlugin } from './kiro.js';
 export { CursorAgentPlugin } from './cursor.js';
+export { KimiK2AgentPlugin } from './kimi-k2.js';

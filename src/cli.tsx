@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 /**
- * ABOUTME: CLI entry point for the Ralph TUI application.
+ * ABOUTME: CLI entry point for the ChoraForge application.
  * Handles subcommands (plugins, run, etc.) and defaults to 'run' when no subcommand given.
+ * Fork of ralph-tui with evolutionary multi-model capabilities.
  */
 
 import {
@@ -22,6 +23,7 @@ import {
   executeInfoCommand,
   executeSkillsCommand,
   executeRemoteCommand,
+  executeBlueprintCommand,
 } from './commands/index.js';
 
 /**
@@ -29,15 +31,17 @@ import {
  */
 function showHelp(): void {
   console.log(`
-Ralph TUI - AI Agent Loop Orchestrator
+ChoraForge - Evolutionary Multi-Model AI Agent Orchestrator
 
-Usage: ralph-tui [command] [options]
+Usage: choraforge [command] [options]
 
 Commands:
-  (none)              Start Ralph execution (same as 'run')
+  (none)              Start execution (same as 'run')
+  blueprint [opts]    Co-author a project blueprint with AI
+  evolve [options]    Run evolutionary multi-model development
   create-prd [opts]   Create a new PRD interactively (alias: prime)
   convert [options]   Convert PRD markdown to JSON format
-  run [options]       Start Ralph execution
+  run [options]       Start execution
   resume [options]    Resume an interrupted session
   status [options]    Check session status (headless, for CI/scripts)
   remote [subcommand] Manage remote server configurations
@@ -96,37 +100,37 @@ Convert Options:
   --force, -f         Overwrite existing files
 
 Examples:
-  ralph-tui                              # Start execution (same as 'run')
-  ralph-tui create-prd                   # Create a new PRD interactively
-  ralph-tui create-prd --chat            # Create PRD with AI chat mode
-  ralph-tui convert --to json ./prd.md   # Convert PRD to JSON
-  ralph-tui run                          # Start execution with defaults
-  ralph-tui run --epic myproject-epic    # Run with specific epic
-  ralph-tui run --prd ./prd.json         # Run with PRD file
-  ralph-tui resume                       # Resume interrupted session
-  ralph-tui status                       # Check session status
-  ralph-tui status --json                # JSON output for CI/scripts
-  ralph-tui logs                         # List iteration logs
-  ralph-tui logs --iteration 5           # View specific iteration
-  ralph-tui logs --task US-005           # View logs for a task
-  ralph-tui logs --clean --keep 10       # Clean up old logs
-  ralph-tui plugins agents               # List agent plugins
-  ralph-tui plugins trackers             # List tracker plugins
-  ralph-tui template show                # Show current prompt template
-  ralph-tui template init                # Create custom template
-  ralph-tui doctor                       # Check if agent is properly configured
-  ralph-tui doctor --json                # JSON output for scripts
-  ralph-tui docs                         # Open documentation in browser
-  ralph-tui docs quickstart              # Open quick start guide
-  ralph-tui info                         # Display system info for bug reports
-  ralph-tui info -c                      # Copyable format for GitHub issues
-  ralph-tui skills list                  # List bundled skills
-  ralph-tui skills install --force       # Force reinstall all skills
-  ralph-tui run --listen                 # Run with remote listener enabled
-  ralph-tui run --listen --rotate-token  # Rotate token and start listener
-  ralph-tui remote add prod server:7890 --token abc  # Add remote
-  ralph-tui remote list                  # List remotes with status
-  ralph-tui remote test prod             # Test connectivity
+  choraforge                              # Start execution (same as 'run')
+  choraforge create-prd                   # Create a new PRD interactively
+  choraforge create-prd --chat            # Create PRD with AI chat mode
+  choraforge convert --to json ./prd.md   # Convert PRD to JSON
+  choraforge run                          # Start execution with defaults
+  choraforge run --epic myproject-epic    # Run with specific epic
+  choraforge run --prd ./prd.json         # Run with PRD file
+  choraforge resume                       # Resume interrupted session
+  choraforge status                       # Check session status
+  choraforge status --json                # JSON output for CI/scripts
+  choraforge logs                         # List iteration logs
+  choraforge logs --iteration 5           # View specific iteration
+  choraforge logs --task US-005           # View logs for a task
+  choraforge logs --clean --keep 10       # Clean up old logs
+  choraforge plugins agents               # List agent plugins
+  choraforge plugins trackers             # List tracker plugins
+  choraforge template show                # Show current prompt template
+  choraforge template init                # Create custom template
+  choraforge doctor                       # Check if agent is properly configured
+  choraforge doctor --json                # JSON output for scripts
+  choraforge docs                         # Open documentation in browser
+  choraforge docs quickstart              # Open quick start guide
+  choraforge info                         # Display system info for bug reports
+  choraforge info -c                      # Copyable format for GitHub issues
+  choraforge skills list                  # List bundled skills
+  choraforge skills install --force       # Force reinstall all skills
+  choraforge run --listen                 # Run with remote listener enabled
+  choraforge run --listen --rotate-token  # Rotate token and start listener
+  choraforge remote add prod server:7890 --token abc  # Add remote
+  choraforge remote list                  # List remotes with status
+  choraforge remote test prod             # Test connectivity
 `);
 }
 
@@ -141,13 +145,37 @@ async function handleSubcommand(args: string[]): Promise<boolean> {
   if (command === 'version' || command === '--version' || command === '-v') {
     // Dynamic import to get version from package.json
     const pkg = await import('../package.json', { with: { type: 'json' } });
-    console.log(`ralph-tui ${pkg.default.version}`);
+    console.log(`choraforge ${pkg.default.version}`);
     return true;
   }
 
   // Help command
   if (command === 'help' || command === '--help' || command === '-h') {
     showHelp();
+    return true;
+  }
+
+  // Blueprint command (ChoraForge-specific)
+  if (command === 'blueprint') {
+    await executeBlueprintCommand(args.slice(1));
+    return true;
+  }
+
+  // Evolve command (ChoraForge-specific) - placeholder
+  if (command === 'evolve') {
+    console.log('ChoraForge Evolution Engine');
+    console.log('─'.repeat(50));
+    console.log('');
+    console.log('Usage: choraforge evolve --blueprint evolution/blueprint.md [--max-versions 10]');
+    console.log('');
+    console.log('The evolution engine is a future capability that will:');
+    console.log('  1. Run gap analysis against your blueprint');
+    console.log('  2. Spawn parallel variants using multiple AI models');
+    console.log('  3. Score and select the best variant (Opus review)');
+    console.log('  4. Merge and tag each version');
+    console.log('');
+    console.log('For now, use the standard run command with the evolution tracker:');
+    console.log('  choraforge run --tracker evolution');
     return true;
   }
 
@@ -297,6 +325,6 @@ async function main(): Promise<void> {
 
 // Run the main function
 main().catch((error: unknown) => {
-  console.error('Failed to start Ralph TUI:', error);
+  console.error('Failed to start ChoraForge:', error);
   process.exit(1);
 });

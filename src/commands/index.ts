@@ -1,6 +1,6 @@
 /**
- * ABOUTME: Commands module for ralph-tui CLI commands.
- * Exports all CLI command handlers for the ralph-tui application.
+ * ABOUTME: Commands module for ChoraForge CLI commands.
+ * Exports all CLI command handlers for the ChoraForge application.
  */
 
 export {
@@ -97,3 +97,9 @@ export {
   parseRemoteArgs,
   printRemoteHelp,
 } from './remote.js';
+
+export {
+  executeBlueprintCommand,
+  parseBlueprintArgs,
+  printBlueprintHelp,
+} from './blueprint.js';
