@@ -157,8 +157,8 @@ export class VariantScorer {
    * Parse scoring output into VariantScore objects.
    */
   private parseScores(output: string, variants: VariantDiff[]): VariantScore[] {
-    // Try to extract JSON array from output
-    const jsonMatch = output.match(/\[[\s\S]*?\]/);
+    // Try to extract JSON array from output (greedy to match outermost brackets)
+    const jsonMatch = output.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       // Fallback: give all variants equal scores
       return variants.map(v => ({
