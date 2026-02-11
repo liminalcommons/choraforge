@@ -333,6 +333,13 @@ export class AppCellOrchestrator {
     return this.runningApps.has(appId);
   }
 
+  /**
+   * US-8: Get the app registry for admin operations (create, list, etc.).
+   */
+  getRegistry(): AppRegistry {
+    return this.registry;
+  }
+
   // ─── Internal: Evolution Loop ──────────────────────────────────────────
 
   /**

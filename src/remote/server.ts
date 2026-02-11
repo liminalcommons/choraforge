@@ -50,6 +50,19 @@ import type {
   OrchestrateStateResponseMessage,
   ParallelEventMessage,
   RemoteOrchestrationState,
+  // Evolution UI types
+  GetEvolutionStateMessage,
+  EvolutionStateResponseMessage,
+  RemoteEvolutionState,
+  GetVersionDetailMessage,
+  VersionDetailResponseMessage,
+  RemoteVersionDetail,
+  EvolutionEventMessage,
+  // Multi-app types (US-8)
+  ListAppsMessage,
+  ListAppsResponseMessage,
+  CreateAppMessage,
+  AppCreatedMessage,
 } from './types.js';
 import {
   validateServerToken,
@@ -66,6 +79,10 @@ import type { TrackerPlugin } from '../plugins/trackers/types.js';
 import type { RalphConfig } from '../config/types.js';
 import { ParallelExecutor, analyzeTaskGraph, shouldRunParallel } from '../parallel/index.js';
 import type { ParallelEvent } from '../parallel/events.js';
+import type { EvolutionEngine as EvolutionEngineType, EvolutionEvent } from '../engine/evolution.js';
+import type { AppCellOrchestrator, OrchestratorEvent } from '../platform/orchestrator.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, extname } from 'node:path';
 
 /**
  * WebSocket data attached to each connection
@@ -104,6 +121,9 @@ interface ClientState {
 
   /** Whether the client is subscribed to parallel events */
   subscribedToParallel?: boolean;
+
+  /** US-8: App ID filter for multi-app subscriptions (undefined = all apps, backward compatible) */
+  appIdFilter?: string | null;
 }
 
 /**
@@ -192,6 +212,15 @@ export interface RemoteServerOptions {
 
   /** Base config for parallel orchestration (required for orchestrate:start) */
   baseConfig?: RalphConfig;
+
+  /** Evolution engine instance (for evolution UI) */
+  evolutionEngine?: EvolutionEngineType;
+
+  /** Directory containing built web UI files to serve (e.g., dist/ui) */
+  webUiDir?: string;
+
+  /** US-8: App Cell Orchestrator for multi-app management */
+  orchestrator?: AppCellOrchestrator;
 }
 
 /**
@@ -241,6 +270,10 @@ export class RemoteServer {
   private orchestrationSession: OrchestrationSession | null = null;
   /** Guard flag to prevent race conditions during orchestration startup */
   private orchestrationStarting: boolean = false;
+  /** Evolution engine event listener unsubscribe function */
+  private evolutionUnsubscribe: (() => void) | null = null;
+  /** US-8: Orchestrator event listener unsubscribe function */
+  private orchestratorUnsubscribe: (() => void) | null = null;
 
   constructor(options: RemoteServerOptions) {
     this.options = options;
@@ -248,6 +281,14 @@ export class RemoteServer {
     // Subscribe to engine events if engine is provided
     if (this.options.engine) {
       this.setupEngineSubscription();
+    }
+    // Subscribe to evolution engine events if provided
+    if (this.options.evolutionEngine) {
+      this.setupEvolutionSubscription();
+    }
+    // Subscribe to orchestrator events if provided (US-8)
+    if (this.options.orchestrator) {
+      this.setupOrchestratorSubscription();
     }
   }
 
@@ -279,6 +320,108 @@ export class RemoteServer {
   setParallelConfig(config: { baseConfig: RalphConfig; tracker: TrackerPlugin }): void {
     this.options.baseConfig = config.baseConfig;
     this.options.tracker = config.tracker;
+  }
+
+  /**
+   * Set the evolution engine for the web UI.
+   */
+  setEvolutionEngine(engine: EvolutionEngineType): void {
+    if (this.evolutionUnsubscribe) {
+      this.evolutionUnsubscribe();
+      this.evolutionUnsubscribe = null;
+    }
+    this.options.evolutionEngine = engine;
+    this.setupEvolutionSubscription();
+  }
+
+  /**
+   * US-8: Set the app cell orchestrator for multi-app management.
+   */
+  setOrchestrator(orchestrator: AppCellOrchestrator): void {
+    if (this.orchestratorUnsubscribe) {
+      this.orchestratorUnsubscribe();
+      this.orchestratorUnsubscribe = null;
+    }
+    this.options.orchestrator = orchestrator;
+    this.setupOrchestratorSubscription();
+  }
+
+  /**
+   * US-8: Subscribe to orchestrator events and forward to subscribed clients.
+   */
+  private setupOrchestratorSubscription(): void {
+    if (!this.options.orchestrator) return;
+
+    this.orchestratorUnsubscribe = this.options.orchestrator.on((event: OrchestratorEvent) => {
+      this.broadcastOrchestratorEvent(event);
+    });
+  }
+
+  /**
+   * US-8: Broadcast an orchestrator event to subscribed clients as an engine_event.
+   * Converts OrchestratorEvent to EngineEventMessage with appId for multi-app filtering.
+   */
+  private broadcastOrchestratorEvent(event: OrchestratorEvent): void {
+    for (const [ws, clientState] of this.clients) {
+      if (!clientState.authenticated || !clientState.subscribed) continue;
+
+      // Apply app ID filter (US-8)
+      if (clientState.appIdFilter && clientState.appIdFilter !== event.appId) continue;
+
+      // Filter by event types if specified
+      if (
+        clientState.subscribedEventTypes &&
+        clientState.subscribedEventTypes.length > 0 &&
+        !clientState.subscribedEventTypes.includes(event.type)
+      ) {
+        continue;
+      }
+
+      // Forward as engine_event with appId
+      const message = createMessage<EngineEventMessage>('engine_event', {
+        event: {
+          type: event.type as EngineEvent['type'],
+          timestamp: event.timestamp,
+          ...(event.detail ?? {}),
+        } as EngineEvent,
+        appId: event.appId,
+      });
+      this.send(ws, message);
+    }
+  }
+
+  /**
+   * Subscribe to evolution engine events and forward to subscribed clients.
+   */
+  private setupEvolutionSubscription(): void {
+    if (!this.options.evolutionEngine) return;
+
+    this.options.evolutionEngine.on((event: EvolutionEvent) => {
+      this.broadcastEvolutionEvent(event);
+    });
+  }
+
+  /**
+   * Broadcast an evolution event to all subscribed clients.
+   */
+  private broadcastEvolutionEvent(event: EvolutionEvent): void {
+    for (const [ws, clientState] of this.clients) {
+      if (!clientState.authenticated || !clientState.subscribed) continue;
+
+      // Filter by event types if specified
+      if (
+        clientState.subscribedEventTypes &&
+        clientState.subscribedEventTypes.length > 0 &&
+        !clientState.subscribedEventTypes.includes(event.type)
+      ) {
+        continue;
+      }
+
+      const message = createMessage<EvolutionEventMessage>('evolution_event', {
+        event,
+      });
+      this.send(ws, message);
+    }
   }
 
   /**
@@ -409,16 +552,44 @@ export class RemoteServer {
           fetch(req, server) {
             // Upgrade HTTP request to WebSocket
             const clientIp = server.requestIP(req)?.address ?? 'unknown';
+            const url = new URL(req.url);
 
             if (server.upgrade(req, { data: { ip: clientIp } })) {
               return; // Upgrade successful
             }
 
-            // Non-WebSocket request - return simple info
+            // Serve screenshot images from the project's evolution directory
+            if (url.pathname.startsWith('/screenshots/') && self.options.cwd) {
+              const filePath = join(self.options.cwd, 'evolution', 'screenshots', url.pathname.slice('/screenshots/'.length));
+              return self.serveStaticFile(filePath);
+            }
+
+            // Serve web UI static files if configured
+            if (self.options.webUiDir) {
+              let filePath: string;
+
+              if (url.pathname.startsWith('/assets/')) {
+                filePath = join(self.options.webUiDir, url.pathname);
+              } else if (url.pathname === '/' || url.pathname === '/index.html') {
+                filePath = join(self.options.webUiDir, 'index.html');
+              } else {
+                // Try exact path first, then fall back to index.html (SPA routing)
+                filePath = join(self.options.webUiDir, url.pathname);
+                if (!existsSync(filePath)) {
+                  filePath = join(self.options.webUiDir, 'index.html');
+                }
+              }
+
+              const response = self.serveStaticFile(filePath);
+              if (response.status !== 404) return response;
+            }
+
+            // Fallback: JSON service info
             return new Response(JSON.stringify({
-              service: 'ralph-tui-remote',
+              service: 'choraforge-remote',
               version: '0.2.1',
               websocket: true,
+              ui: !!self.options.webUiDir,
             }), {
               headers: { 'Content-Type': 'application/json' },
             });
@@ -504,6 +675,18 @@ export class RemoteServer {
       this.engineUnsubscribe = null;
     }
 
+    // Unsubscribe from evolution events
+    if (this.evolutionUnsubscribe) {
+      this.evolutionUnsubscribe();
+      this.evolutionUnsubscribe = null;
+    }
+
+    // Unsubscribe from orchestrator events (US-8)
+    if (this.orchestratorUnsubscribe) {
+      this.orchestratorUnsubscribe();
+      this.orchestratorUnsubscribe = null;
+    }
+
     // Close all client connections
     for (const [ws] of this.clients) {
       try {
@@ -537,6 +720,40 @@ export class RemoteServer {
       connectedClients: this.clients.size,
       pid: process.pid,
     };
+  }
+
+  /**
+   * Serve a static file from disk with appropriate MIME type.
+   */
+  private serveStaticFile(filePath: string): Response {
+    if (!existsSync(filePath)) {
+      return new Response('Not Found', { status: 404 });
+    }
+
+    const ext = extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.html': 'text/html; charset=utf-8',
+      '.js': 'application/javascript; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.svg': 'image/svg+xml',
+      '.ico': 'image/x-icon',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2',
+    };
+
+    const contentType = mimeTypes[ext] ?? 'application/octet-stream';
+    const content = readFileSync(filePath);
+
+    return new Response(content, {
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
+      },
+    });
   }
 
   /**
@@ -648,6 +865,22 @@ export class RemoteServer {
         await this.handlePushConfig(ws, clientState, message as PushConfigMessage);
         break;
 
+      // Evolution UI operations
+      case 'get_evolution_state':
+        this.handleGetEvolutionState(ws, message as GetEvolutionStateMessage);
+        break;
+      case 'get_version_detail':
+        this.handleGetVersionDetail(ws, message as GetVersionDetailMessage);
+        break;
+
+      // US-8: Multi-app operations
+      case 'list_apps':
+        await this.handleListApps(ws, message as ListAppsMessage);
+        break;
+      case 'create_app':
+        await this.handleCreateApp(ws, message as CreateAppMessage);
+        break;
+
       // Parallel orchestration operations
       case 'orchestrate:start':
         await this.handleOrchestrateStart(ws, clientState, message as OrchestrateStartMessage);
@@ -684,6 +917,8 @@ export class RemoteServer {
   ): void {
     clientState.subscribed = true;
     clientState.subscribedEventTypes = message.eventTypes;
+    // US-8: Capture optional app ID filter (null/undefined = all apps)
+    clientState.appIdFilter = message.appId ?? undefined;
 
     const response = createMessage<OperationResultMessage>('operation_result', {
       operation: 'subscribe',
@@ -703,6 +938,7 @@ export class RemoteServer {
   ): void {
     clientState.subscribed = false;
     clientState.subscribedEventTypes = undefined;
+    clientState.appIdFilter = undefined;
 
     const response = createMessage<OperationResultMessage>('operation_result', {
       operation: 'unsubscribe',
@@ -1092,6 +1328,202 @@ export class RemoteServer {
       error,
     });
     response.id = requestId;
+    this.send(ws, response);
+  }
+
+  // ============================================================================
+  // US-8: Multi-App Handlers
+  // ============================================================================
+
+  /**
+   * Handle list_apps request — return all registered apps with their status.
+   */
+  private async handleListApps(
+    ws: ServerWebSocket<WebSocketData>,
+    message: ListAppsMessage
+  ): Promise<void> {
+    if (!this.options.orchestrator) {
+      const response = createMessage<ListAppsResponseMessage>('list_apps_response', {
+        success: false,
+        error: 'No orchestrator attached to server',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+      return;
+    }
+
+    try {
+      const orchestrator = this.options.orchestrator;
+      const registry = orchestrator.getRegistry();
+      const allEntries = await registry.list();
+
+      // Get status for each registered app (getAppStatus works for all registered apps)
+      const apps = await Promise.all(
+        allEntries.map((entry) => orchestrator.getAppStatus(entry.id))
+      );
+
+      const response = createMessage<ListAppsResponseMessage>('list_apps_response', {
+        success: true,
+        apps,
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    } catch (error) {
+      const response = createMessage<ListAppsResponseMessage>('list_apps_response', {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list apps',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handle create_app request — register a new app via the orchestrator.
+   * Note: This only registers the app in the registry; launchApp() must be called separately.
+   */
+  private async handleCreateApp(
+    ws: ServerWebSocket<WebSocketData>,
+    message: CreateAppMessage
+  ): Promise<void> {
+    if (!this.options.orchestrator) {
+      const response = createMessage<AppCreatedMessage>('app_created', {
+        success: false,
+        error: 'No orchestrator attached to server',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+      return;
+    }
+
+    try {
+      const registry = this.options.orchestrator.getRegistry();
+
+      const entry = await registry.create({
+        name: message.name,
+        repoUrl: 'https://placeholder.local/app',
+        stackType: 'node',
+        agentType: 'openclaw',
+        currentVersion: '0.0.0',
+        blueprintPath: message.blueprintPath,
+      });
+
+      const response = createMessage<AppCreatedMessage>('app_created', {
+        success: true,
+        appId: entry.id,
+        appName: entry.name,
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    } catch (error) {
+      const response = createMessage<AppCreatedMessage>('app_created', {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create app',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    }
+  }
+
+  // ============================================================================
+  // Evolution UI Handlers
+  // ============================================================================
+
+  /**
+   * Handle get_evolution_state request - return current evolution status, blueprint, and versions.
+   */
+  private handleGetEvolutionState(
+    ws: ServerWebSocket<WebSocketData>,
+    message: GetEvolutionStateMessage
+  ): void {
+    if (!this.options.evolutionEngine) {
+      const response = createMessage<EvolutionStateResponseMessage>('evolution_state_response', {
+        success: false,
+        error: 'No evolution engine attached',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+      return;
+    }
+
+    const evolutionStatus = this.options.evolutionEngine.getStatus();
+    const registry = this.options.evolutionEngine.getVersionRegistry();
+    const appInfo = registry.getAppInfo();
+
+    const state: RemoteEvolutionState = {
+      appId: appInfo.appId,
+      appName: appInfo.appName,
+      status: evolutionStatus.status,
+      currentVersion: evolutionStatus.version,
+      blueprint: evolutionStatus.blueprint,
+      versions: registry.getVersions(),
+    };
+
+    const response = createMessage<EvolutionStateResponseMessage>('evolution_state_response', {
+      success: true,
+      state,
+    });
+    response.id = message.id;
+    this.send(ws, response);
+  }
+
+  /**
+   * Handle get_version_detail request - return detailed info about a specific version.
+   */
+  private handleGetVersionDetail(
+    ws: ServerWebSocket<WebSocketData>,
+    message: GetVersionDetailMessage
+  ): void {
+    if (!this.options.evolutionEngine) {
+      const response = createMessage<VersionDetailResponseMessage>('version_detail_response', {
+        success: false,
+        error: 'No evolution engine attached',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+      return;
+    }
+
+    const registry = this.options.evolutionEngine.getVersionRegistry();
+    const summary = registry.getVersion(message.version);
+
+    if (!summary) {
+      const response = createMessage<VersionDetailResponseMessage>('version_detail_response', {
+        success: false,
+        error: `Version ${message.version} not found`,
+      });
+      response.id = message.id;
+      this.send(ws, response);
+      return;
+    }
+
+    // Try to load the report from disk
+    let report = null;
+    if (this.options.cwd && summary.reportPath) {
+      try {
+        const reportAbsPath = join(this.options.cwd, summary.reportPath);
+        if (existsSync(reportAbsPath)) {
+          // Report is markdown, but we also stored EvolutionReport data in the registry
+          // For now, return what we have from the summary
+          report = null; // Full report loading would require storing JSON alongside MD
+        }
+      } catch {
+        // Report file not readable
+      }
+    }
+
+    const detail: RemoteVersionDetail = {
+      summary,
+      report,
+      allScores: [], // Would require persisting scores separately
+      agentUsage: {},
+    };
+
+    const response = createMessage<VersionDetailResponseMessage>('version_detail_response', {
+      success: true,
+      detail,
+    });
+    response.id = message.id;
     this.send(ws, response);
   }
 
@@ -1839,6 +2271,9 @@ export async function createRemoteServer(
     gitInfo: options.gitInfo,
     cwd: options.cwd,
     baseConfig: options.baseConfig,
+    evolutionEngine: options.evolutionEngine,
+    webUiDir: options.webUiDir,
+    orchestrator: options.orchestrator,
   };
 
   return new RemoteServer(serverOptions);

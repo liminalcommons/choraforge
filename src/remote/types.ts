@@ -265,6 +265,8 @@ export interface SubscribeMessage extends WSMessage {
   type: 'subscribe';
   /** Optional filter for specific event types (if empty, subscribes to all) */
   eventTypes?: string[];
+  /** Optional app ID filter for multi-app mode (null/undefined = all apps, backward compatible) */
+  appId?: string | null;
 }
 
 /**
@@ -282,13 +284,18 @@ export interface EngineEventMessage extends WSMessage {
   type: 'engine_event';
   /** The original engine event */
   event: EngineEvent;
+  /** App ID this event belongs to (multi-app mode). Undefined for legacy single-app. */
+  appId?: string;
 }
 
 /**
  * Request current engine state snapshot.
+ * In multi-app mode, optionally request state for a specific app.
  */
 export interface GetStateMessage extends WSMessage {
   type: 'get_state';
+  /** App ID to get state for (null/undefined = default/legacy single-app behavior) */
+  appId?: string | null;
 }
 
 /**
@@ -328,6 +335,8 @@ export interface RemoteGitInfo {
 }
 
 export interface RemoteEngineState {
+  /** App ID this state belongs to (multi-app mode). Undefined for legacy single-app. */
+  appId?: string;
   status: EngineStatus;
   currentIteration: number;
   currentTask: TrackerTask | null;
@@ -584,6 +593,10 @@ import type {
   WorkerDisplayState,
   MergeOperation,
 } from '../parallel/types.js';
+import type { EvolutionEvent, EvolutionStatus, EvolutionReport } from '../engine/evolution.js';
+import type { Blueprint } from '../commands/blueprint.js';
+import type { VersionSummary } from '../engine/version-registry.js';
+import type { VariantScore } from '../engine/variant-scorer.js';
 
 /**
  * Request to start parallel orchestration on remote.
@@ -707,6 +720,150 @@ export interface ParallelEventMessage extends WSMessage {
   event: ParallelEvent;
 }
 
+// ============================================================================
+// Evolution UI Message Types
+// ============================================================================
+
+/**
+ * Request current evolution state (blueprint, versions, status).
+ */
+export interface GetEvolutionStateMessage extends WSMessage {
+  type: 'get_evolution_state';
+}
+
+/**
+ * Snapshot of evolution state for the web UI.
+ */
+export interface RemoteEvolutionState {
+  /** App identifier */
+  appId: string;
+  /** App display name */
+  appName: string;
+  /** Current evolution status */
+  status: EvolutionStatus;
+  /** Current version number */
+  currentVersion: number;
+  /** Blueprint data (if loaded) */
+  blueprint: Blueprint | null;
+  /** All version summaries */
+  versions: VersionSummary[];
+}
+
+/**
+ * Response with evolution state snapshot.
+ */
+export interface EvolutionStateResponseMessage extends WSMessage {
+  type: 'evolution_state_response';
+  /** Whether the state was retrieved successfully */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** Evolution state snapshot */
+  state?: RemoteEvolutionState;
+}
+
+/**
+ * Request detailed information about a specific version.
+ */
+export interface GetVersionDetailMessage extends WSMessage {
+  type: 'get_version_detail';
+  /** Version number to get details for */
+  version: number;
+}
+
+/**
+ * Detailed version data for the web UI.
+ */
+export interface RemoteVersionDetail {
+  /** Version summary */
+  summary: VersionSummary;
+  /** Full evolution report */
+  report: EvolutionReport | null;
+  /** All variant scores for comparison */
+  allScores: VariantScore[];
+  /** Per-agent usage counts */
+  agentUsage: Record<string, number>;
+}
+
+/**
+ * Response with version detail.
+ */
+export interface VersionDetailResponseMessage extends WSMessage {
+  type: 'version_detail_response';
+  /** Whether the detail was retrieved successfully */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** Version detail data */
+  detail?: RemoteVersionDetail;
+}
+
+/**
+ * Evolution event forwarded to subscribed clients.
+ * Wraps the original evolution event with message metadata.
+ */
+export interface EvolutionEventMessage extends WSMessage {
+  type: 'evolution_event';
+  /** The original evolution event */
+  event: EvolutionEvent;
+  /** App ID this event belongs to (multi-app mode). Undefined for legacy single-app. */
+  appId?: string;
+}
+
+// ============================================================================
+// US-8: Multi-App WebSocket Message Types
+// ============================================================================
+
+import type { AppCellStatus } from '../platform/orchestrator.js';
+
+/**
+ * Request a list of all registered apps and their status.
+ */
+export interface ListAppsMessage extends WSMessage {
+  type: 'list_apps';
+}
+
+/**
+ * Response with list of all apps.
+ */
+export interface ListAppsResponseMessage extends WSMessage {
+  type: 'list_apps_response';
+  /** Whether the request succeeded */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** List of app statuses */
+  apps?: AppCellStatus[];
+}
+
+/**
+ * Request to create/register a new app via the orchestrator.
+ */
+export interface CreateAppMessage extends WSMessage {
+  type: 'create_app';
+  /** Display name for the new app */
+  name: string;
+  /** Path to the app's blueprint file */
+  blueprintPath?: string;
+  /** Description of the app */
+  description?: string;
+}
+
+/**
+ * Confirmation that an app was created.
+ */
+export interface AppCreatedMessage extends WSMessage {
+  type: 'app_created';
+  /** Whether the creation succeeded */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** The newly created app's ID */
+  appId?: string;
+  /** The app name */
+  appName?: string;
+}
+
 /**
  * All possible remote control message types (extending base types).
  */
@@ -743,4 +900,15 @@ export type RemoteWSMessageType =
   | OrchestrateStopMessage
   | OrchestrateGetStateMessage
   | OrchestrateStateResponseMessage
-  | ParallelEventMessage;
+  | ParallelEventMessage
+  // Evolution UI messages
+  | GetEvolutionStateMessage
+  | EvolutionStateResponseMessage
+  | GetVersionDetailMessage
+  | VersionDetailResponseMessage
+  | EvolutionEventMessage
+  // Multi-app messages (US-8)
+  | ListAppsMessage
+  | ListAppsResponseMessage
+  | CreateAppMessage
+  | AppCreatedMessage;
