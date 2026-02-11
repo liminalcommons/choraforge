@@ -63,6 +63,13 @@ import type {
   ListAppsResponseMessage,
   CreateAppMessage,
   AppCreatedMessage,
+  // Blueprint dialogue types (US-9)
+  StartBlueprintDialogueMessage,
+  StartBlueprintDialogueResponseMessage,
+  DialogueMessage,
+  DialogueResponseMessage,
+  BlueprintFinalizedMessage,
+  BlueprintFinalizedResponseMessage,
 } from './types.js';
 import {
   validateServerToken,
@@ -81,6 +88,7 @@ import { ParallelExecutor, analyzeTaskGraph, shouldRunParallel } from '../parall
 import type { ParallelEvent } from '../parallel/events.js';
 import type { EvolutionEngine as EvolutionEngineType, EvolutionEvent } from '../engine/evolution.js';
 import type { AppCellOrchestrator, OrchestratorEvent } from '../platform/orchestrator.js';
+import { BlueprintDialogueEngine } from '../platform/blueprint-dialogue.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, extname } from 'node:path';
 
@@ -274,10 +282,14 @@ export class RemoteServer {
   private evolutionUnsubscribe: (() => void) | null = null;
   /** US-8: Orchestrator event listener unsubscribe function */
   private orchestratorUnsubscribe: (() => void) | null = null;
+  /** US-9: Blueprint dialogue engine for chat-based blueprint creation */
+  private dialogueEngine: BlueprintDialogueEngine;
 
   constructor(options: RemoteServerOptions) {
     this.options = options;
     this.auditLogger = createAuditLogger();
+    // US-9: Initialize blueprint dialogue engine
+    this.dialogueEngine = new BlueprintDialogueEngine();
     // Subscribe to engine events if engine is provided
     if (this.options.engine) {
       this.setupEngineSubscription();
@@ -881,6 +893,17 @@ export class RemoteServer {
         await this.handleCreateApp(ws, message as CreateAppMessage);
         break;
 
+      // US-9: Blueprint dialogue operations
+      case 'start_blueprint_dialogue':
+        await this.handleStartBlueprintDialogue(ws, message as StartBlueprintDialogueMessage);
+        break;
+      case 'dialogue_message':
+        await this.handleDialogueMessage(ws, message as DialogueMessage);
+        break;
+      case 'blueprint_finalized':
+        await this.handleBlueprintFinalized(ws, message as BlueprintFinalizedMessage);
+        break;
+
       // Parallel orchestration operations
       case 'orchestrate:start':
         await this.handleOrchestrateStart(ws, clientState, message as OrchestrateStartMessage);
@@ -1423,6 +1446,114 @@ export class RemoteServer {
       response.id = message.id;
       this.send(ws, response);
     }
+  }
+
+  // ============================================================================
+  // US-9: Blueprint Dialogue Handlers
+  // ============================================================================
+
+  /**
+   * Handle start_blueprint_dialogue request — create a new dialogue session.
+   */
+  private async handleStartBlueprintDialogue(
+    ws: ServerWebSocket<WebSocketData>,
+    message: StartBlueprintDialogueMessage
+  ): Promise<void> {
+    try {
+      const result = await this.dialogueEngine.startDialogue(
+        message.appId,
+        message.initialContext
+      );
+
+      const response = createMessage<StartBlueprintDialogueResponseMessage>(
+        'start_blueprint_dialogue_response',
+        {
+          success: true,
+          dialogueId: result.dialogueId,
+          assistantMessage: result.assistantMessage,
+        }
+      );
+      response.id = message.id;
+      this.send(ws, response);
+    } catch (error) {
+      const response = createMessage<StartBlueprintDialogueResponseMessage>(
+        'start_blueprint_dialogue_response',
+        {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to start dialogue',
+        }
+      );
+      response.id = message.id;
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handle dialogue_message request — send human message and return AI response.
+   */
+  private async handleDialogueMessage(
+    ws: ServerWebSocket<WebSocketData>,
+    message: DialogueMessage
+  ): Promise<void> {
+    try {
+      const result = await this.dialogueEngine.sendMessage(
+        message.dialogueId,
+        message.content
+      );
+
+      const response = createMessage<DialogueResponseMessage>(
+        'dialogue_response',
+        {
+          dialogueId: message.dialogueId,
+          success: true,
+          assistantMessage: result.assistantMessage,
+          blueprintReady: result.blueprintReady,
+          draftBlueprint: result.draftBlueprint ?? undefined,
+        }
+      );
+      response.id = message.id;
+      this.send(ws, response);
+    } catch (error) {
+      const response = createMessage<DialogueResponseMessage>(
+        'dialogue_response',
+        {
+          dialogueId: message.dialogueId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to process dialogue message',
+        }
+      );
+      response.id = message.id;
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handle blueprint_finalized request — save the blueprint to disk.
+   */
+  private async handleBlueprintFinalized(
+    ws: ServerWebSocket<WebSocketData>,
+    message: BlueprintFinalizedMessage
+  ): Promise<void> {
+    // Determine where to save the blueprint
+    const cellDir = this.options.cwd ?? process.cwd();
+
+    const result = this.dialogueEngine.saveBlueprint(
+      message.dialogueId,
+      message.blueprint,
+      cellDir
+    );
+
+    const response = createMessage<BlueprintFinalizedResponseMessage>(
+      'blueprint_finalized_response',
+      {
+        success: result.success,
+        error: result.error,
+        mdPath: result.mdPath,
+        jsonPath: result.jsonPath,
+      }
+    );
+    response.id = message.id;
+    this.send(ws, response);
   }
 
   // ============================================================================

@@ -864,6 +864,108 @@ export interface AppCreatedMessage extends WSMessage {
   appName?: string;
 }
 
+// ============================================================================
+// US-9: Blueprint Dialogue Message Types
+// ============================================================================
+
+// Blueprint type already imported above (line ~597) from '../commands/blueprint.js'
+
+/**
+ * Dialogue turn representing a single message in the blueprint dialogue.
+ */
+export interface DialogueTurn {
+  /** Role: 'assistant' for AI questions, 'user' for human answers */
+  role: 'assistant' | 'user';
+  /** The message content */
+  content: string;
+  /** When this turn occurred (ISO 8601) */
+  timestamp: string;
+}
+
+/**
+ * Start a new blueprint dialogue session.
+ * The server creates a dialogue engine and returns the first AI question.
+ */
+export interface StartBlueprintDialogueMessage extends WSMessage {
+  type: 'start_blueprint_dialogue';
+  /** App ID to create the blueprint for */
+  appId: string;
+  /** Optional initial context (e.g., "I want to build a todo app") */
+  initialContext?: string;
+}
+
+/**
+ * Response to starting a dialogue — includes the session ID and first AI message.
+ */
+export interface StartBlueprintDialogueResponseMessage extends WSMessage {
+  type: 'start_blueprint_dialogue_response';
+  /** Whether the dialogue was started successfully */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** Unique dialogue session ID */
+  dialogueId?: string;
+  /** The AI's first message (greeting + first question) */
+  assistantMessage?: string;
+}
+
+/**
+ * Human sends a message in the dialogue.
+ */
+export interface DialogueMessage extends WSMessage {
+  type: 'dialogue_message';
+  /** Dialogue session ID */
+  dialogueId: string;
+  /** The human's message */
+  content: string;
+}
+
+/**
+ * AI responds in the dialogue.
+ */
+export interface DialogueResponseMessage extends WSMessage {
+  type: 'dialogue_response';
+  /** Dialogue session ID */
+  dialogueId: string;
+  /** Whether the response was generated successfully */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** The AI's response */
+  assistantMessage?: string;
+  /** Whether the AI thinks the blueprint is ready for review */
+  blueprintReady?: boolean;
+  /** Draft blueprint (included when blueprintReady is true) */
+  draftBlueprint?: Blueprint;
+}
+
+/**
+ * Human approves the blueprint, optionally with edits.
+ * The server finalizes it and writes to disk.
+ */
+export interface BlueprintFinalizedMessage extends WSMessage {
+  type: 'blueprint_finalized';
+  /** Dialogue session ID */
+  dialogueId: string;
+  /** The finalized blueprint (may have been edited by the human) */
+  blueprint: Blueprint;
+}
+
+/**
+ * Response confirming the blueprint was saved.
+ */
+export interface BlueprintFinalizedResponseMessage extends WSMessage {
+  type: 'blueprint_finalized_response';
+  /** Whether the blueprint was saved successfully */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** Path where blueprint.md was saved */
+  mdPath?: string;
+  /** Path where blueprint.json was saved */
+  jsonPath?: string;
+}
+
 /**
  * All possible remote control message types (extending base types).
  */
@@ -911,4 +1013,11 @@ export type RemoteWSMessageType =
   | ListAppsMessage
   | ListAppsResponseMessage
   | CreateAppMessage
-  | AppCreatedMessage;
+  | AppCreatedMessage
+  // Blueprint dialogue messages (US-9)
+  | StartBlueprintDialogueMessage
+  | StartBlueprintDialogueResponseMessage
+  | DialogueMessage
+  | DialogueResponseMessage
+  | BlueprintFinalizedMessage
+  | BlueprintFinalizedResponseMessage;
