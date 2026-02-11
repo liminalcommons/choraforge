@@ -7,9 +7,11 @@
 import React, { useState } from 'react';
 import { useEvolutionState } from './hooks/useEvolutionState.js';
 import { useApps } from './hooks/useApps.js';
+import { useAppStatus } from './hooks/useAppStatus.js';
 import { Dashboard } from './pages/Dashboard.js';
 import { AppDetail } from './pages/AppDetail.js';
 import { VersionDetail } from './pages/VersionDetail.js';
+import { EvolutionClient } from './lib/ws-client.js';
 
 // Derive WebSocket URL from current location
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -38,11 +40,51 @@ export function App(): React.ReactElement {
   // Multi-app hook
   const { apps, connected: multiAppConnected, error: multiAppError, createApp } = useApps(wsUrl, token);
 
+  // App status hook for the currently viewed app
+  const currentAppId = view.page === 'app' ? view.appId : null;
+  const { status: appStatus } = useAppStatus(wsUrl, token, currentAppId ?? '');
+
   // Use multi-app connection status if we have apps, otherwise fall back to single-app
   const connected = apps.length > 0 ? multiAppConnected : singleAppConnected;
   const error = multiAppError || singleAppError;
 
   const navigate = (v: View) => setView(v);
+
+  // Evolution control handlers
+  const clientRef = React.useRef<EvolutionClient | null>(null);
+
+  const getEvolutionClient = () => {
+    if (!clientRef.current) {
+      clientRef.current = new EvolutionClient(wsUrl, token);
+    }
+    return clientRef.current;
+  };
+
+  const handlePauseEvolution = async () => {
+    if (currentAppId) {
+      const client = getEvolutionClient();
+      await client.pauseApp(currentAppId);
+    }
+  };
+
+  const handleResumeEvolution = async () => {
+    if (currentAppId) {
+      const client = getEvolutionClient();
+      await client.resumeApp(currentAppId);
+    }
+  };
+
+  const handleStopEvolution = async () => {
+    if (currentAppId) {
+      const client = getEvolutionClient();
+      await client.stopApp(currentAppId);
+    }
+  };
+
+  const handleUpdateBlueprint = () => {
+    // TODO: Open blueprint dialogue interface
+    console.log('Update Blueprint - not implemented yet');
+  };
 
   const handleCreateApp = async () => {
     if (!newAppName.trim()) {
@@ -108,8 +150,13 @@ export function App(): React.ReactElement {
         {view.page === 'app' && state && (
           <AppDetail
             state={state}
+            appStatus={appStatus ?? undefined}
             onSelectVersion={(v) => navigate({ page: 'version', appId: view.appId, version: v })}
             onBack={() => navigate({ page: 'dashboard' })}
+            onUpdateBlueprint={handleUpdateBlueprint}
+            onPauseEvolution={handlePauseEvolution}
+            onResumeEvolution={handleResumeEvolution}
+            onStopEvolution={handleStopEvolution}
           />
         )}
 

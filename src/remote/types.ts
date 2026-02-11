@@ -865,6 +865,75 @@ export interface AppCreatedMessage extends WSMessage {
 }
 
 // ============================================================================
+// US-12: App Control Message Types
+// ============================================================================
+
+/**
+ * Request to get detailed status for a specific app.
+ */
+export interface GetAppStatusMessage extends WSMessage {
+  type: 'get_app_status';
+  /** App ID to get status for */
+  appId: string;
+}
+
+/**
+ * Response with detailed app status.
+ */
+export interface AppStatusResponseMessage extends WSMessage {
+  type: 'app_status_response';
+  /** Whether the request succeeded */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** App cell status */
+  status?: AppCellStatus;
+}
+
+/**
+ * Request to pause evolution for an app.
+ */
+export interface PauseAppMessage extends WSMessage {
+  type: 'pause_app';
+  /** App ID to pause */
+  appId: string;
+}
+
+/**
+ * Request to resume evolution for a paused app.
+ */
+export interface ResumeAppMessage extends WSMessage {
+  type: 'resume_app';
+  /** App ID to resume */
+  appId: string;
+}
+
+/**
+ * Request to stop evolution for an app.
+ */
+export interface StopAppMessage extends WSMessage {
+  type: 'stop_app';
+  /** App ID to stop */
+  appId: string;
+}
+
+/**
+ * Orchestrator event forwarded to subscribed clients.
+ * Provides real-time updates on app lifecycle and evolution progress.
+ */
+export interface OrchestratorEventMessage extends WSMessage {
+  type: 'orchestrator_event';
+  /** The original orchestrator event */
+  event: {
+    type: string;
+    timestamp: string;
+    appId: string;
+    appName: string;
+    detail?: Record<string, unknown>;
+  };
+}
+
+// ============================================================================
 // US-9: Blueprint Dialogue Message Types
 // ============================================================================
 
@@ -1014,6 +1083,13 @@ export type RemoteWSMessageType =
   | ListAppsResponseMessage
   | CreateAppMessage
   | AppCreatedMessage
+  // App control messages (US-12)
+  | GetAppStatusMessage
+  | AppStatusResponseMessage
+  | PauseAppMessage
+  | ResumeAppMessage
+  | StopAppMessage
+  | OrchestratorEventMessage
   // Blueprint dialogue messages (US-9)
   | StartBlueprintDialogueMessage
   | StartBlueprintDialogueResponseMessage

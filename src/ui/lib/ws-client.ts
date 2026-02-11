@@ -135,6 +135,38 @@ export class EvolutionClient {
   }
 
   /**
+   * Get detailed status for a specific app.
+   */
+  async getAppStatus(appId: string): Promise<{ success: boolean; status?: AppCellStatusUI; error?: string }> {
+    const response = await this.request('get_app_status', { appId }) as { success: boolean; status?: AppCellStatusUI; error?: string };
+    return response;
+  }
+
+  /**
+   * Pause evolution for an app.
+   */
+  async pauseApp(appId: string): Promise<{ success: boolean; error?: string }> {
+    const response = await this.request('pause_app', { appId }) as { success: boolean; error?: string };
+    return response;
+  }
+
+  /**
+   * Resume evolution for a paused app.
+   */
+  async resumeApp(appId: string): Promise<{ success: boolean; error?: string }> {
+    const response = await this.request('resume_app', { appId }) as { success: boolean; error?: string };
+    return response;
+  }
+
+  /**
+   * Stop evolution for an app.
+   */
+  async stopApp(appId: string): Promise<{ success: boolean; error?: string }> {
+    const response = await this.request('stop_app', { appId }) as { success: boolean; error?: string };
+    return response;
+  }
+
+  /**
    * Register a handler for a specific event type.
    */
   on(eventType: string, handler: MessageHandler): () => void {
@@ -182,6 +214,12 @@ export class EvolutionClient {
     // Handle engine events
     if (type === 'engine_event') {
       this.emit('engine_event', data.event);
+      return;
+    }
+
+    // Handle orchestrator events (US-12)
+    if (type === 'orchestrator_event') {
+      this.emit('orchestrator_event', data.event);
       return;
     }
 

@@ -63,6 +63,12 @@ import type {
   ListAppsResponseMessage,
   CreateAppMessage,
   AppCreatedMessage,
+  // App control types (US-12)
+  GetAppStatusMessage,
+  AppStatusResponseMessage,
+  PauseAppMessage,
+  ResumeAppMessage,
+  StopAppMessage,
   // Blueprint dialogue types (US-9)
   StartBlueprintDialogueMessage,
   StartBlueprintDialogueResponseMessage,
@@ -893,6 +899,20 @@ export class RemoteServer {
         await this.handleCreateApp(ws, message as CreateAppMessage);
         break;
 
+      // US-12: App control operations
+      case 'get_app_status':
+        await this.handleGetAppStatus(ws, message as GetAppStatusMessage);
+        break;
+      case 'pause_app':
+        await this.handlePauseApp(ws, message as PauseAppMessage);
+        break;
+      case 'resume_app':
+        await this.handleResumeApp(ws, message as ResumeAppMessage);
+        break;
+      case 'stop_app':
+        await this.handleStopApp(ws, message as StopAppMessage);
+        break;
+
       // US-9: Blueprint dialogue operations
       case 'start_blueprint_dialogue':
         await this.handleStartBlueprintDialogue(ws, message as StartBlueprintDialogueMessage);
@@ -1442,6 +1462,193 @@ export class RemoteServer {
       const response = createMessage<AppCreatedMessage>('app_created', {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to create app',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    }
+  }
+
+  // ============================================================================
+  // US-12: App Control Handlers
+  // ============================================================================
+
+  /**
+   * Handle get_app_status request — return detailed status for a specific app.
+   */
+  private async handleGetAppStatus(
+    ws: ServerWebSocket<WebSocketData>,
+    message: GetAppStatusMessage
+  ): Promise<void> {
+    if (!this.options.orchestrator) {
+      const response = createMessage<AppStatusResponseMessage>('app_status_response', {
+        success: false,
+        error: 'No orchestrator attached to server',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+      return;
+    }
+
+    try {
+      const status = await this.options.orchestrator.getAppStatus(message.appId);
+      const response = createMessage<AppStatusResponseMessage>('app_status_response', {
+        success: true,
+        status,
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    } catch (error) {
+      const response = createMessage<AppStatusResponseMessage>('app_status_response', {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get app status',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handle pause_app request — pause evolution for an app.
+   * Note: This sets the evolution.running flag to false, which stops the evolution loop.
+   */
+  private async handlePauseApp(
+    ws: ServerWebSocket<WebSocketData>,
+    message: PauseAppMessage
+  ): Promise<void> {
+    if (!this.options.orchestrator) {
+      const response = createMessage<OperationResultMessage>('operation_result', {
+        operation: 'pause_app',
+        success: false,
+        error: 'No orchestrator attached to server',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+      return;
+    }
+
+    try {
+      // Check if app is running
+      if (!this.options.orchestrator.isRunning(message.appId)) {
+        const response = createMessage<OperationResultMessage>('operation_result', {
+          operation: 'pause_app',
+          success: false,
+          error: 'App is not running',
+        });
+        response.id = message.id;
+        this.send(ws, response);
+        return;
+      }
+
+      // The orchestrator doesn't have a pause method, but we can stop and restart
+      // For now, we'll stop the app which pauses the evolution
+      await this.options.orchestrator.stopApp(message.appId);
+
+      const response = createMessage<OperationResultMessage>('operation_result', {
+        operation: 'pause_app',
+        success: true,
+        data: { message: 'App paused (stopped). Use launch to resume.' },
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    } catch (error) {
+      const response = createMessage<OperationResultMessage>('operation_result', {
+        operation: 'pause_app',
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to pause app',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handle resume_app request — resume evolution for a paused app.
+   * Note: This re-launches the app with the same blueprint.
+   */
+  private async handleResumeApp(
+    ws: ServerWebSocket<WebSocketData>,
+    message: ResumeAppMessage
+  ): Promise<void> {
+    if (!this.options.orchestrator) {
+      const response = createMessage<OperationResultMessage>('operation_result', {
+        operation: 'resume_app',
+        success: false,
+        error: 'No orchestrator attached to server',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+      return;
+    }
+
+    try {
+      const registry = this.options.orchestrator.getRegistry();
+      const app = await registry.get(message.appId);
+
+      if (!app) {
+        const response = createMessage<OperationResultMessage>('operation_result', {
+          operation: 'resume_app',
+          success: false,
+          error: 'App not found',
+        });
+        response.id = message.id;
+        this.send(ws, response);
+        return;
+      }
+
+      // Re-launch the app to resume evolution
+      await this.options.orchestrator.launchApp(message.appId);
+
+      const response = createMessage<OperationResultMessage>('operation_result', {
+        operation: 'resume_app',
+        success: true,
+        data: { message: 'App resumed' },
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    } catch (error) {
+      const response = createMessage<OperationResultMessage>('operation_result', {
+        operation: 'resume_app',
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to resume app',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handle stop_app request — stop evolution for an app.
+   */
+  private async handleStopApp(
+    ws: ServerWebSocket<WebSocketData>,
+    message: StopAppMessage
+  ): Promise<void> {
+    if (!this.options.orchestrator) {
+      const response = createMessage<OperationResultMessage>('operation_result', {
+        operation: 'stop_app',
+        success: false,
+        error: 'No orchestrator attached to server',
+      });
+      response.id = message.id;
+      this.send(ws, response);
+      return;
+    }
+
+    try {
+      await this.options.orchestrator.stopApp(message.appId);
+
+      const response = createMessage<OperationResultMessage>('operation_result', {
+        operation: 'stop_app',
+        success: true,
+        data: { message: 'App stopped' },
+      });
+      response.id = message.id;
+      this.send(ws, response);
+    } catch (error) {
+      const response = createMessage<OperationResultMessage>('operation_result', {
+        operation: 'stop_app',
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to stop app',
       });
       response.id = message.id;
       this.send(ws, response);
