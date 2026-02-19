@@ -129,6 +129,37 @@ export const TrackerPluginConfigSchema = z.object({
 });
 
 /**
+ * Screenshot capture configuration for evolution
+ */
+export const EvolutionScreenshotConfigSchema = z.object({
+  /** Whether screenshot capture is enabled */
+  enabled: z.boolean().optional(),
+  /** URL to navigate to for the screenshot */
+  url: z.string().optional(),
+  /** CSS selector to wait for before capturing */
+  waitForSelector: z.string().optional(),
+  /** Delay in ms after selector is found before capturing */
+  delay: z.number().int().min(0).max(30000).optional(),
+  /** Viewport dimensions */
+  viewport: z.object({
+    width: z.number().int().min(100).max(3840).optional(),
+    height: z.number().int().min(100).max(2160).optional(),
+  }).optional(),
+});
+
+/**
+ * Evolution UI configuration
+ */
+export const EvolutionUiConfigSchema = z.object({
+  /** Whether the web UI is enabled (default: true) */
+  enabled: z.boolean().optional(),
+  /** Port for the web UI (default: 18080) */
+  port: z.number().int().min(1024).max(65535).optional(),
+  /** Auto-open browser on evolve start */
+  openBrowser: z.boolean().optional(),
+});
+
+/**
  * Stored configuration schema (global or project config file)
  * Both global (~/.config/ralph-tui/config.toml) and project (.ralph-tui/config.toml)
  * use this schema.
@@ -218,6 +249,45 @@ export const StoredConfigSchema = z
 
     // Conflict resolution configuration for parallel execution
     conflictResolution: ConflictResolutionConfigSchema.optional(),
+
+    // Evolution UI configuration
+    ui: EvolutionUiConfigSchema.optional(),
+
+    // Evolution screenshot configuration
+    evolutionScreenshot: EvolutionScreenshotConfigSchema.optional(),
+
+    // Multi-model evolution routing configuration
+    evolutionRouting: z
+      .object({
+        /**
+         * Complexity label → agent name routing table.
+         * Keys must match "complexity:<level>" where level is one of:
+         *   mechanical | simple | feature | architecture | review
+         * Values must be agent names defined in the top-level `agents` array.
+         */
+        routing: z
+          .record(
+            z.string().regex(
+              /^complexity:(mechanical|simple|feature|architecture|review)$/,
+              'Routing keys must be "complexity:<level>" (mechanical|simple|feature|architecture|review)'
+            ),
+            z.string().min(1)
+          )
+          .optional(),
+        /**
+         * Usage tracking method override per agent name.
+         * - 'rate-limit-detect': Watch for rate limit errors and back off (default)
+         * - 'always-available': Skip rate limit detection (use for high-quota providers like GLM, Kimi)
+         * - 'api-balance': Check available API balance (reserved for future use)
+         */
+        usageMethods: z
+          .record(
+            z.string().min(1),
+            z.enum(['rate-limit-detect', 'api-balance', 'always-available'])
+          )
+          .optional(),
+      })
+      .optional(),
   })
   .strict();
 

@@ -13,6 +13,7 @@ import { loadBlueprint } from '../commands/blueprint.js';
 import { UsageTracker, type UsageTrackerConfig } from './usage-tracker.js';
 import { VariantScorer, type VariantDiff, type VariantScore, type VariantScorerConfig } from './variant-scorer.js';
 import type { AgentPlugin } from '../plugins/agents/types.js';
+import { VersionRegistry, captureScreenshot, type ScreenshotConfig } from './version-registry.js';
 
 /**
  * Configuration for the evolution engine.
@@ -36,10 +37,21 @@ export interface EvolutionConfig {
   defaultAgent: string;
   /** Agent instances by name */
   agents: Record<string, AgentPlugin>;
+  /**
+   * Usage tracking method override per agent name.
+   * Defaults to 'rate-limit-detect' when not specified.
+   * Use 'always-available' for high-quota providers (GLM, Kimi, local models)
+   * that don't need back-off logic.
+   */
+  usageMethods?: Record<string, 'rate-limit-detect' | 'api-balance' | 'always-available'>;
   /** Agent to use for gap analysis and scoring (typically Opus) */
   architectAgent: AgentPlugin;
   /** Maximum workers for parallel execution */
   maxWorkers: number;
+  /** Screenshot capture configuration (optional) */
+  screenshot?: ScreenshotConfig;
+  /** Display name for the app in the web UI */
+  appName?: string;
 }
 
 /**
@@ -107,6 +119,7 @@ export class EvolutionEngine {
   private blueprint: Blueprint | null = null;
   private usageTracker: UsageTracker;
   private variantScorer: VariantScorer;
+  private versionRegistry: VersionRegistry;
   private status: EvolutionStatus = 'idle';
   private currentVersion = 0;
   private listeners: Array<(event: EvolutionEvent) => void> = [];
@@ -125,8 +138,9 @@ export class EvolutionEngine {
       models: {},
     };
     for (const agentName of Object.keys(config.agents)) {
+      const method = config.usageMethods?.[agentName] ?? 'rate-limit-detect';
       usageConfig.models[agentName] = {
-        method: agentName === 'glm' ? 'always-available' : 'rate-limit-detect',
+        method,
         rateLimitCooldownMs: 60_000,
       };
     }
@@ -139,6 +153,9 @@ export class EvolutionEngine {
       timeout: 180_000, // 3 minutes for scoring
     };
     this.variantScorer = new VariantScorer(scorerConfig);
+
+    // Initialize version registry
+    this.versionRegistry = new VersionRegistry(config.cwd, config.appName);
 
     // Ensure directories exist
     if (!existsSync(config.reportsDir)) {
@@ -251,6 +268,21 @@ export class EvolutionEngine {
       };
 
       this.writeReport(report);
+
+      // Capture screenshot if configured
+      let screenshotRelPath: string | null = null;
+      if (this.config.screenshot?.enabled) {
+        const screenshotFileName = `v0.${this.currentVersion}.png`;
+        const screenshotAbsPath = join(this.versionRegistry.getScreenshotsDir(), screenshotFileName);
+        const result = await captureScreenshot(this.config.screenshot, screenshotAbsPath);
+        if (result) {
+          screenshotRelPath = join('evolution', 'screenshots', screenshotFileName);
+        }
+      }
+
+      // Record version in registry
+      this.versionRegistry.recordVersion(report, screenshotRelPath);
+
       this.emit({ type: 'evolution:version-complete', report });
 
       // Step 8: Check if all criteria are met
@@ -289,6 +321,13 @@ export class EvolutionEngine {
       version: this.currentVersion,
       blueprint: this.blueprint,
     };
+  }
+
+  /**
+   * Get the version registry for accessing version history.
+   */
+  getVersionRegistry(): VersionRegistry {
+    return this.versionRegistry;
   }
 
   /**

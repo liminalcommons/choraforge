@@ -295,6 +295,40 @@ export interface StoredConfig {
 
   /** Conflict resolution configuration for parallel execution */
   conflictResolution?: ConflictResolutionConfig;
+
+  /**
+   * Multi-model evolution routing configuration.
+   * Maps complexity labels to specific agent names and overrides usage tracking
+   * methods per agent (e.g., 'always-available' for high-quota providers like GLM/Kimi).
+   */
+  evolutionRouting?: EvolutionRoutingConfig;
+}
+
+/**
+ * Evolution routing configuration for multi-model agent dispatch.
+ * Used by EvolutionEngine to route tasks by complexity to the right agent.
+ */
+export interface EvolutionRoutingConfig {
+  /**
+   * Complexity label → agent name mapping.
+   * Keys: "complexity:mechanical" | "complexity:simple" | "complexity:feature" |
+   *       "complexity:architecture" | "complexity:review"
+   * Values: agent names from the `agents` array.
+   *
+   * @example
+   *   { "complexity:mechanical": "opencode-glm", "complexity:architecture": "claude-opus" }
+   */
+  routing?: Record<string, string>;
+
+  /**
+   * Usage tracking method override per agent name.
+   * When omitted, defaults to 'rate-limit-detect'.
+   * Use 'always-available' for high-quota providers (GLM, Kimi, local models).
+   *
+   * @example
+   *   { "opencode-glm": "always-available", "claude-opus": "rate-limit-detect" }
+   */
+  usageMethods?: Record<string, 'rate-limit-detect' | 'api-balance' | 'always-available'>;
 }
 
 /**

@@ -1,0 +1,71 @@
+# .choraforge.yaml — ChoraForge multi-model agent configuration example
+#
+# Copy this file to .choraforge.yaml (or .ralph-tui/config.toml for TOML format)
+# and adjust the agent names, models, and routing to suit your setup.
+#
+# Multi-model routing strategy used in this example:
+#   - Mechanical/simple tasks → GLM-5 or Kimi-K2 (high-quota, no rate limits)
+#   - Feature tasks           → Kimi-K2 (strong Chinese LLM, generous limits)
+#   - Architecture/review     → Claude Opus (best reasoning, rate-limited)
+
+# ── Agent definitions ─────────────────────────────────────────────────────────
+
+agents:
+  # Claude Opus — for complex architecture and review tasks
+  - name: claude-opus
+    plugin: claude
+    options:
+      model: claude-opus-4-6
+
+  # Claude Sonnet — general-purpose fallback
+  - name: claude-sonnet
+    plugin: claude
+    default: true
+    options:
+      model: claude-sonnet-4-6
+    fallbackAgents:
+      - opencode-kimi
+
+  # OpenCode + Kimi K2 — strong code LLM, very high quota via Z.AI
+  - name: opencode-kimi
+    plugin: opencode
+    options:
+      model: moonshot/kimi-k2-0711
+      provider: moonshot
+    fallbackAgents:
+      - opencode-glm
+
+  # OpenCode + GLM-5 — always-available via Z.AI, good for mechanical tasks
+  - name: opencode-glm
+    plugin: opencode
+    options:
+      model: zhipu/glm-5-0520
+      provider: zhipu
+
+# ── Evolution routing ─────────────────────────────────────────────────────────
+
+evolutionRouting:
+  # Route complexity labels to specific agents
+  routing:
+    "complexity:mechanical": opencode-glm       # Simple edits, formatting, typos
+    "complexity:simple":     opencode-glm       # Small single-file changes
+    "complexity:feature":    opencode-kimi      # Multi-file feature implementation
+    "complexity:architecture": claude-opus      # Design, cross-cutting concerns
+    "complexity:review":     claude-opus        # Code review, gap analysis
+
+  # Usage tracking methods per agent
+  # 'always-available' = skip rate limit detection (use for unlimited providers)
+  # 'rate-limit-detect' = watch for rate limit errors and back off (default)
+  usageMethods:
+    opencode-glm:    always-available   # GLM via Z.AI — effectively unlimited
+    opencode-kimi:   always-available   # Kimi K2 via Z.AI — very high quota
+    claude-sonnet:   rate-limit-detect  # Anthropic API — standard rate limits
+    claude-opus:     rate-limit-detect  # Anthropic API — strict rate limits
+
+# ── General settings ──────────────────────────────────────────────────────────
+
+maxIterations: 20
+iterationDelay: 2000
+
+# Tracker (beads is default for ChoraForge)
+tracker: beads
