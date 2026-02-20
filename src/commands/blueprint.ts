@@ -9,6 +9,12 @@ import { join, resolve, dirname } from 'node:path';
 import { getAgentRegistry } from '../plugins/agents/registry.js';
 import { registerBuiltinAgents } from '../plugins/agents/builtin/index.js';
 import type { AgentExecuteOptions } from '../plugins/agents/types.js';
+import {
+  executeBlueprintInitCommand,
+  executeBlueprintAddCommand,
+  executeBlueprintListCommand,
+  executeBlueprintStatusCommand,
+} from './blueprint-coauthor.js';
 
 /**
  * Blueprint format representing the co-authored project vision.
@@ -280,6 +286,13 @@ export function loadBlueprint(path: string): Blueprint | null {
  * captures output, parses blueprint, and saves to disk.
  */
 export async function executeBlueprintCommand(args: string[]): Promise<void> {
+  // Dispatch co-authoring subcommands
+  const sub = args[0];
+  if (sub === 'init') { await executeBlueprintInitCommand(args.slice(1)); return; }
+  if (sub === 'add') { await executeBlueprintAddCommand(args.slice(1)); return; }
+  if (sub === 'list') { await executeBlueprintListCommand(args.slice(1)); return; }
+  if (sub === 'status') { await executeBlueprintStatusCommand(args.slice(1)); return; }
+
   const parsedArgs = parseBlueprintArgs(args);
 
   if (parsedArgs.help) {

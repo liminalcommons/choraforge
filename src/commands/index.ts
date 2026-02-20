@@ -105,6 +105,13 @@ export {
 } from './blueprint.js';
 
 export {
+  executeBlueprintInitCommand,
+  executeBlueprintAddCommand,
+  executeBlueprintListCommand,
+  executeBlueprintStatusCommand,
+} from './blueprint-coauthor.js';
+
+export {
   executeAppCreateCommand,
   parseAppCreateArgs,
   printAppCreateHelp,
