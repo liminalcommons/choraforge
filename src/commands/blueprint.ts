@@ -273,20 +273,10 @@ export function serializeBlueprint(blueprint: Blueprint): string {
 
 /**
  * Load an existing blueprint from disk.
- * Supports both JSON format (blueprint.json from Phase 3 co-authoring commands)
- * and markdown format (blueprint.md from interactive session).
  */
 export function loadBlueprint(path: string): Blueprint | null {
   if (!existsSync(path)) return null;
   const content = readFileSync(path, 'utf-8');
-  // Detect JSON format (blueprint.json)
-  if (content.trimStart().startsWith('{')) {
-    try {
-      return JSON.parse(content) as Blueprint;
-    } catch {
-      return null;
-    }
-  }
   return parseBlueprint(content);
 }
 
