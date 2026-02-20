@@ -122,10 +122,6 @@ export {
 } from './evolve.js';
 
 export {
-  executeEvolveCommand,
-} from './evolve.js';
-
-export {
   executeAppCreateCommand,
   parseAppCreateArgs,
   printAppCreateHelp,
