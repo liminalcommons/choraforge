@@ -24,6 +24,7 @@ import {
   executeSkillsCommand,
   executeRemoteCommand,
   executeBlueprintCommand,
+  executeEvolveCommand,
   executeAppCreateCommand,
   executeAppListCommand,
   executeAppStartCommand,
@@ -235,21 +236,9 @@ async function handleSubcommand(args: string[]): Promise<boolean> {
     return true;
   }
 
-  // Evolve command (ChoraForge-specific) - placeholder
+  // Evolve command (ChoraForge-specific)
   if (command === 'evolve') {
-    console.log('ChoraForge Evolution Engine');
-    console.log('─'.repeat(50));
-    console.log('');
-    console.log('Usage: choraforge evolve --blueprint evolution/blueprint.md [--max-versions 10]');
-    console.log('');
-    console.log('The evolution engine is a future capability that will:');
-    console.log('  1. Run gap analysis against your blueprint');
-    console.log('  2. Spawn parallel variants using multiple AI models');
-    console.log('  3. Score and select the best variant (Opus review)');
-    console.log('  4. Merge and tag each version');
-    console.log('');
-    console.log('For now, use the standard run command with the evolution tracker:');
-    console.log('  choraforge run --tracker evolution');
+    await executeEvolveCommand(args.slice(1));
     return true;
   }
 

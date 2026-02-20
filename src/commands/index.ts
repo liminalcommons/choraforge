@@ -112,6 +112,20 @@ export {
 } from './blueprint-coauthor.js';
 
 export {
+  executeEvolveCommand,
+  parseEvolveArgs,
+  printEvolveHelp,
+  loadStoredConfigFromDir,
+  loadBlueprintJson,
+  initializeAgentsFromConfig,
+  buildEvolutionConfig,
+} from './evolve.js';
+
+export {
+  executeEvolveCommand,
+} from './evolve.js';
+
+export {
   executeAppCreateCommand,
   parseAppCreateArgs,
   printAppCreateHelp,
